@@ -81,20 +81,32 @@ endfunction
 "     str: The found git repository root. If not root was found, return an empty string.
 "
 function! s:GetGitRoot(path)
-    " Note: This function only works on Linux!
-    let l:parts = split(a:path, '/')
-    let l:index = 0
-    let l:length = len(parts)
+    let l:current = a:path
+    let l:previous = l:current . 'extra_string_to_make_it_different_from_current'
+    let l:iteration = 0
+    let l:max_iterations = 100
 
-    for part in l:parts
-        let l:root = join([''] + parts[:l:length - l:index], '/')
-
-        if finddir('.git', l:root) != "" || findfile('.git', l:root) != ""
-            return l:root
+    while l:current != l:previous && l:iteration < l:max_iterations
+        " Detect if we've reached a root (Windows drive or Unix root)
+        " Also check for UNC paths (Windows network shares starting with \\\\)
+        let l:is_root = l:current =~# '^\\\\.*'
+        if l:current =~# '^[A-Za-z]:\\\\$'
+            let l:is_root = 1
+        elseif l:current ==# '/'
+            let l:is_root = 1
+        elseif l:is_root
+            " UNC paths - add to loop counter to prevent infinite loops
         endif
 
-        let index += 1
-    endfor
+        if filereadable(l:current . '/.git') || isdirectory(l:current . '/.git')
+            return l:current
+        endif
+
+        " Go up one directory level
+        let l:previous = l:current
+        let l:current = fnamemodify(l:current, ':h')
+        let l:iteration = l:iteration + 1
+    endwhile
 
     return ''
 endfunction
